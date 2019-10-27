@@ -564,7 +564,7 @@ g_file_info_find_value_by_name (GFileInfo  *info,
  *
  * Checks if a file info structure has an attribute named @attribute.
  *
- * Returns: %TRUE if @Ginfo has an attribute named @attribute,
+ * Returns: %TRUE if @info has an attribute named @attribute,
  *     %FALSE otherwise.
  **/
 gboolean
@@ -588,7 +588,7 @@ g_file_info_has_attribute (GFileInfo  *info,
  * Checks if a file info structure has an attribute in the
  * specified @name_space.
  *
- * Returns: %TRUE if @Ginfo has an attribute in @name_space,
+ * Returns: %TRUE if @info has an attribute in @name_space,
  *     %FALSE otherwise.
  *
  * Since: 2.22
@@ -1049,7 +1049,7 @@ g_file_info_get_attribute_uint64 (GFileInfo  *info,
  * @attribute: a file attribute key.
  *
  * Gets a signed 64-bit integer contained within the attribute. If the
- * attribute does not contain an signed 64-bit integer, or is invalid,
+ * attribute does not contain a signed 64-bit integer, or is invalid,
  * 0 will be returned.
  *
  * Returns: a signed 64-bit integer from the attribute.
@@ -1790,6 +1790,10 @@ G_GNUC_END_IGNORE_DEPRECATIONS
  * Gets the modification time of the current @info and returns it as a
  * #GDateTime.
  *
+ * This requires the %G_FILE_ATTRIBUTE_TIME_MODIFIED attribute. If
+ * %G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC is provided, the resulting #GDateTime
+ * will have microsecond precision.
+ *
  * Returns: (transfer full) (nullable): modification time, or %NULL if unknown
  * Since: 2.62
  */
@@ -1812,12 +1816,13 @@ g_file_info_get_modification_date_time (GFileInfo *info)
   if (value == NULL)
     return NULL;
 
+  dt = g_date_time_new_from_unix_utc (_g_file_attribute_value_get_uint64 (value));
+
   value_usec = g_file_info_find_value (info, attr_mtime_usec);
   if (value_usec == NULL)
-    return NULL;
+    return g_steal_pointer (&dt);
 
-  dt = g_date_time_new_from_unix_utc (_g_file_attribute_value_get_uint64 (value));
-  dt2 = g_date_time_add_seconds (dt, _g_file_attribute_value_get_uint32 (value_usec) / (gdouble) G_USEC_PER_SEC);
+  dt2 = g_date_time_add (dt, _g_file_attribute_value_get_uint32 (value_usec));
   g_date_time_unref (dt);
 
   return g_steal_pointer (&dt2);
@@ -2158,8 +2163,9 @@ g_file_info_set_size (GFileInfo *info,
  * @info: a #GFileInfo.
  * @mtime: a #GTimeVal.
  *
- * Sets the %G_FILE_ATTRIBUTE_TIME_MODIFIED attribute in the file
- * info to the given time value.
+ * Sets the %G_FILE_ATTRIBUTE_TIME_MODIFIED and
+ * %G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC attributes in the file info to the
+ * given time value.
  *
  * Deprecated: 2.62: Use g_file_info_set_modification_date_time() instead, as
  *    #GTimeVal is deprecated due to the year 2038 problem.
@@ -2195,8 +2201,9 @@ G_GNUC_END_IGNORE_DEPRECATIONS
  * @info: a #GFileInfo.
  * @mtime: (not nullable): a #GDateTime.
  *
- * Sets the %G_FILE_ATTRIBUTE_TIME_MODIFIED attribute in the file
- * info to the given date/time value.
+ * Sets the %G_FILE_ATTRIBUTE_TIME_MODIFIED and
+ * %G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC attributes in the file info to the
+ * given date/time value.
  *
  * Since: 2.62
  */
@@ -2384,7 +2391,7 @@ matcher_optimize (GFileAttributeMatcher *matcher)
  * the number of references falls to 0, the #GFileAttributeMatcher is
  * automatically destroyed.
  *
- * The @attribute string should be formatted with specific keys separated
+ * The @attributes string should be formatted with specific keys separated
  * from namespaces with a double colon. Several "namespace::key" strings may be
  * concatenated with a single comma (e.g. "standard::type,standard::is-hidden").
  * The wildcard "*" may be used to match all keys and namespaces, or

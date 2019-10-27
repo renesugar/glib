@@ -1,11 +1,11 @@
 project('glib', 'c', 'cpp',
-  version : '2.61.3',
+  version : '2.63.0',
   # NOTE: We keep this pinned at 0.49 because that's what Debian 10 ships
   meson_version : '>= 0.49.2',
   default_options : [
     'buildtype=debugoptimized',
     'warning_level=1',
-    'c_std=gnu89'
+    'c_std=gnu99'
   ]
 )
 
@@ -75,6 +75,9 @@ installed_tests_execdir = join_paths(glib_libexecdir, 'installed-tests', meson.p
 installed_tests_enabled = get_option('installed_tests')
 installed_tests_template = files('template.test.in')
 installed_tests_template_tap = files('template-tap.test.in')
+
+# Don’t build the tests unless we can run them (either natively, in an exe wrapper, or by installing them for later use)
+build_tests = not meson.is_cross_build() or (meson.is_cross_build() and meson.has_exe_wrapper()) or installed_tests_enabled
 
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
 
@@ -400,9 +403,22 @@ add_project_arguments(cc.get_supported_arguments(warning_c_args), language: 'c')
 # improve this.
 glib_link_flags = cc.get_supported_link_arguments(warning_c_link_args)
 
-# Windows Support (7+)
+# Windows SDK requirements and checks
 if host_system == 'windows'
-  glib_conf.set('_WIN32_WINNT', '0x0601')
+  # Check whether we're building for UWP apps
+  code = '''
+  #include <windows.h>
+  #if !(WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP) && !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP))
+  #error "Not building for UWP"
+  #endif'''
+  if cc.compiles(code, name : 'building for UWP')
+    glib_conf.set('G_WINAPI_ONLY_APP', true)
+    # We require Windows 10+ on WinRT
+    glib_conf.set('_WIN32_WINNT', '0x0A00')
+  else
+    # We require Windows 7+ on Win32
+    glib_conf.set('_WIN32_WINNT', '0x0601')
+  endif
 endif
 
 functions = [
@@ -708,6 +724,28 @@ elif cc.links(clock_gettime_test_code, args : '-lrt', name : 'clock_gettime in l
   librt = cc.find_library('rt')
 endif
 
+dlopen_dlsym_test_code = '''
+#include <dlfcn.h>
+int glib_underscore_test (void) { return 42; }
+int main (int argc, char ** argv) {
+  void *f1 = (void*)0, *f2 = (void*)0, *handle;
+  handle = dlopen ((void*)0, 0);
+  if (handle) {
+    f1 = dlsym (handle, "glib_underscore_test");
+    f2 = dlsym (handle, "_glib_underscore_test");
+  }
+  return (!f2 || f1);
+}'''
+libdl_dep = []
+if cc.links(dlopen_dlsym_test_code, name : 'dlopen() and dlsym() in system libraries')
+  have_dlopen_dlsym = true
+elif cc.links(dlopen_dlsym_test_code, args : '-ldl', name : 'dlopen() and dlsym() in libdl')
+  have_dlopen_dlsym = true
+  libdl_dep = cc.find_library('dl')
+else
+  have_dlopen_dlsym = false
+endif
+
 # if statfs() takes 2 arguments (Posix) or 4 (Solaris)
 if have_func_statfs
   if cc.compiles(glib_conf_prefix + '''
@@ -913,20 +951,15 @@ else
   glib_conf.set('EXEEXT', '')
 endif
 
-if have_good_vsnprintf and have_good_snprintf and have_good_printf
-  # Our printf is 'good' only if vsnpintf()/snprintf()/printf() supports C99 well enough
-  glib_conf.set('HAVE_GOOD_PRINTF', 1)
-else
+# Our printf is 'good' only if vsnpintf()/snprintf()/printf() supports C99 well enough
+use_system_printf = have_good_vsnprintf and have_good_snprintf and have_good_printf
+glib_conf.set('USE_SYSTEM_PRINTF', use_system_printf)
+glibconfig_conf.set('GLIB_USING_SYSTEM_PRINTF', use_system_printf)
+
+if not use_system_printf
+  # gnulib has vasprintf so override the previous check
   glib_conf.set('HAVE_VASPRINTF', 1)
 endif
-
-glibconfig_conf.set('GLIB_USING_SYSTEM_PRINTF',
-                    have_good_vsnprintf and have_good_snprintf and have_good_printf)
-
-# Check whether the printf() family supports Unix98 %n$ positional parameters
-# AC_FUNC_PRINTF_UNIX98
-# Nothing uses HAVE_UNIX98_PRINTF
-
 
 # Check for nl_langinfo and CODESET
 if cc.links('''#include <langinfo.h>
@@ -1661,6 +1694,25 @@ else
                 dependencies : thread_dep)
     # Linux, Solaris, etc.
     glib_conf.set('HAVE_PTHREAD_SETNAME_NP_WITH_TID', 1)
+  elif cc.links(pthread_prefix + '''
+                int main() {
+                  pthread_setname_np(pthread_self(), "%s", "example");
+                  return 0;
+                }''',
+                name : 'pthread_setname_np(pthread_t, const char*, void*)',
+                dependencies : thread_dep)
+    # NetBSD
+    glib_conf.set('HAVE_PTHREAD_SETNAME_NP_WITH_TID_AND_ARG', 1)
+  elif cc.links(pthread_prefix + '''
+                #include <pthread_np.h>
+                int main() {
+                  pthread_set_name_np(pthread_self(), "example");
+                  return 0;
+                }''',
+                name : 'pthread_set_name_np(pthread_t, const char*)',
+                dependencies : thread_dep)
+    # FreeBSD, DragonFlyBSD, OpenBSD, etc.
+    glib_conf.set('HAVE_PTHREAD_SET_NAME_NP', 1)
   endif
 endif
 
@@ -1945,7 +1997,7 @@ python = import('python').find_installation('python3')
 python_name = 'python3'
 
 python_version = python.language_version()
-python_version_req = '>=3.4'
+python_version_req = '>=3.5'
 if not python_version.version_compare(python_version_req)
   error('Requires Python @0@, @1@ found.'.format(python_version_req, python_version))
 endif
@@ -1974,6 +2026,8 @@ if host_system == 'windows'
 elif host_system == 'cygwin'
   export_dynamic_ldflags = ['-Wl,--export-all-symbols']
 elif host_system == 'darwin'
+  export_dynamic_ldflags = []
+elif host_system == 'sunos'
   export_dynamic_ldflags = []
 else
   export_dynamic_ldflags = ['-Wl,--export-dynamic']
@@ -2048,8 +2102,6 @@ subdir('gthread')
 subdir('gmodule')
 subdir('gio')
 subdir('fuzzing')
-# Don’t build the tests unless we can run them (either natively or in an exe wrapper)
-build_tests = not meson.is_cross_build() or (meson.is_cross_build() and meson.has_exe_wrapper())
 if build_tests
   subdir('tests')
 endif

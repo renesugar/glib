@@ -29,6 +29,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#ifdef G_OS_UNIX
+#include <sys/utsname.h>
+#endif
 #ifdef G_OS_WIN32
 #include <windows.h>
 #endif
@@ -517,6 +520,39 @@ test_desktop_special_dir (void)
   g_assert (dir2 != NULL);
 }
 
+static void
+test_os_info (void)
+{
+  gchar *name;
+  gchar *contents = NULL;
+#ifdef G_OS_UNIX
+  struct utsname info;
+#endif
+
+  /* Whether this is implemented or not, it must not crash */
+  name = g_get_os_info (G_OS_INFO_KEY_NAME);
+  g_test_message ("%s: %s",
+                  G_OS_INFO_KEY_NAME,
+                  name == NULL ? "(null)" : name);
+
+#if defined (G_OS_WIN32) || defined (__APPLE__)
+  /* These OSs have a special case so NAME should always succeed */
+  g_assert_nonnull (name);
+#elif defined (G_OS_UNIX)
+  if (g_file_get_contents ("/etc/os-release", &contents, NULL, NULL) ||
+      g_file_get_contents ("/usr/lib/os-release", &contents, NULL, NULL) ||
+      uname (&info) == 0)
+    g_assert_nonnull (name);
+  else
+    g_test_skip ("os-release(5) API not implemented on this platform");
+#else
+  g_test_skip ("g_get_os_info() not supported on this platform");
+#endif
+
+  g_free (name);
+  g_free (contents);
+}
+
 static gboolean
 source_test (gpointer data)
 {
@@ -767,6 +803,7 @@ main (int   argc,
 #endif
   g_test_add_func ("/utils/specialdir", test_special_dir);
   g_test_add_func ("/utils/specialdir/desktop", test_desktop_special_dir);
+  g_test_add_func ("/utils/os-info", test_os_info);
   g_test_add_func ("/utils/clear-pointer", test_clear_pointer);
   g_test_add_func ("/utils/clear-pointer-cast", test_clear_pointer_cast);
   g_test_add_func ("/utils/clear-pointer/side-effects", test_clear_pointer_side_effects);

@@ -1442,7 +1442,7 @@ g_settings_set_enum (GSettings   *settings,
  * to the flags value that it represents.
  *
  * In order to use this function the type of the value must be an array
- * of strings and it must be marked in the schema file as an flags type.
+ * of strings and it must be marked in the schema file as a flags type.
  *
  * It is a programmer error to give a @key that isn't contained in the
  * schema for @settings or is not marked as a flags type.
@@ -2469,7 +2469,7 @@ g_settings_get_child (GSettings   *settings,
  *
  * Returns: (transfer full) (element-type utf8): a list of the keys on
  *    @settings, in no defined order
- * Deprecated: 2.46: Use g_settings_schema_list_keys instead().
+ * Deprecated: 2.46: Use g_settings_schema_list_keys() instead.
  */
 gchar **
 g_settings_list_keys (GSettings *settings)

@@ -166,6 +166,57 @@ g_array_new (gboolean zero_terminated,
 }
 
 /**
+ * g_array_steal:
+ * @array: a #GArray.
+ * @len: (optional) (out caller-allocates): pointer to retrieve the number of
+ *    elements of the original array
+ *
+ * Frees the data in the array and resets the size to zero, while
+ * the underlying array is preserved for use elsewhere and returned
+ * to the caller.
+ *
+ * If the array was created with the @zero_terminate property
+ * set to %TRUE, the returned data is zero terminated too.
+ *
+ * If array elements contain dynamically-allocated memory,
+ * the array elements should also be freed by the caller.
+ *
+ * A short example of use:
+ * |[<!-- language="C" -->
+ * ...
+ * gpointer data;
+ * gsize data_len;
+ * data = g_array_steal (some_array, &data_len);
+ * ...
+ * ]|
+
+ * Returns: (transfer full): the element data, which should be
+ *     freed using g_free().
+ *
+ * Since: 2.64
+ */
+gpointer
+g_array_steal (GArray *array,
+               gsize *len)
+{
+  GRealArray *rarray;
+  gpointer segment;
+
+  g_return_val_if_fail (array != NULL, NULL);
+
+  rarray = (GRealArray *) array;
+  segment = (gpointer) rarray->data;
+
+  if (len != NULL)
+    *len = rarray->len;
+
+  rarray->data  = NULL;
+  rarray->len   = 0;
+  rarray->alloc = 0;
+  return segment;
+}
+
+/**
  * g_array_sized_new:
  * @zero_terminated: %TRUE if the array should have an extra element at
  *     the end with all bits cleared
@@ -874,12 +925,20 @@ g_array_binary_search (GArray        *array,
 static guint
 g_nearest_pow (guint num)
 {
-  guint n = 1;
+  guint n = num - 1;
 
-  while (n < num && n > 0)
-    n <<= 1;
+  g_assert (num > 0);
 
-  return n ? n : num;
+  n |= n >> 1;
+  n |= n >> 2;
+  n |= n >> 4;
+  n |= n >> 8;
+  n |= n >> 16;
+#if SIZEOF_INT == 8
+  n |= n >> 32;
+#endif
+
+  return n + 1;
 }
 
 static void
@@ -1003,6 +1062,46 @@ GPtrArray*
 g_ptr_array_new (void)
 {
   return g_ptr_array_sized_new (0);
+}
+
+/**
+ * g_ptr_array_steal:
+ * @array: a #GPtrArray.
+ * @len: (optional) (out caller-allocates): pointer to retrieve the number of
+ *    elements of the original array
+ *
+ * Frees the data in the array and resets the size to zero, while
+ * the underlying array is preserved for use elsewhere and returned
+ * to the caller.
+ *
+ * Even if set, the #GDestroyNotify function will never be called
+ * on the current contents of the array and the caller is
+ * responsible for freeing the array elements.
+ *
+ * Returns: (transfer full): the element data, which should be
+ *     freed using g_free().
+ *
+ * Since: 2.64
+ */
+gpointer *
+g_ptr_array_steal (GPtrArray *array,
+                   gsize *len)
+{
+  GRealPtrArray *rarray;
+  gpointer *segment;
+
+  g_return_val_if_fail (array != NULL, NULL);
+
+  rarray = (GRealPtrArray *) array;
+  segment = (gpointer *) rarray->pdata;
+
+  if (len != NULL)
+    *len = rarray->len;
+
+  rarray->pdata = NULL;
+  rarray->len   = 0;
+  rarray->alloc = 0;
+  return segment;
 }
 
 /**
@@ -1787,7 +1886,32 @@ g_ptr_array_insert (GPtrArray *array,
  *
  * Note that the comparison function for g_ptr_array_sort() doesn't
  * take the pointers from the array as arguments, it takes pointers to
- * the pointers in the array.
+ * the pointers in the array. Here is a full example of usage:
+ *
+ * |[<!-- language="C" -->
+ * typedef struct
+ * {
+ *   gchar *name;
+ *   gint size;
+ * } FileListEntry;
+ *
+ * static gint
+ * sort_filelist (gconstpointer a, gconstpointer b)
+ * {
+ *   const FileListEntry *entry1 = *((FileListEntry **) a);
+ *   const FileListEntry *entry2 = *((FileListEntry **) b);
+ *
+ *   return g_ascii_strcasecmp (entry1->name, entry2->name);
+ * }
+ *
+ * …
+ * g_autoptr (GPtrArray) file_list = NULL;
+ *
+ * // initialize file_list array and load with many FileListEntry entries
+ * ...
+ * // now sort it with
+ * g_ptr_array_sort (file_list, (GCompareFunc) sort_filelist);
+ * ]|
  *
  * This is guaranteed to be a stable sort since version 2.32.
  */
@@ -1816,7 +1940,52 @@ g_ptr_array_sort (GPtrArray    *array,
  *
  * Note that the comparison function for g_ptr_array_sort_with_data()
  * doesn't take the pointers from the array as arguments, it takes
- * pointers to the pointers in the array.
+ * pointers to the pointers in the array. Here is a full example of use:
+ *
+ * |[<!-- language="C" -->
+ * typedef enum { SORT_NAME, SORT_SIZE } SortMode;
+ *
+ * typedef struct
+ * {
+ *   gchar *name;
+ *   gint size;
+ * } FileListEntry;
+ *
+ * static gint
+ * sort_filelist (gconstpointer a, gconstpointer b, gpointer user_data)
+ * {
+ *   gint order;
+ *   const SortMode *sort_mode = GPOINTER_TO_INT (user_data);
+ *   const FileListEntry *entry1 = *((FileListEntry **) a);
+ *   const FileListEntry *entry2 = *((FileListEntry **) b);
+ *
+ *   switch (*sort_mode)
+ *     {
+ *     case SORT_NAME:
+ *       order = g_ascii_strcasecmp (entry1->name, entry2->name);
+ *       break;
+ *     case SORT_SIZE:
+ *       order = entry1->size - entry2->size;
+ *       break;
+ *     default:
+ *       order = 0;
+ *       break;
+ *     }
+ *   return order;
+ * }
+ *
+ * ...
+ * g_autoptr (GPtrArray) file_list = NULL;
+ * SortMode sort_mode;
+ *
+ * // initialize file_list array and load with many FileListEntry entries
+ * ...
+ * // now sort it with
+ * sort_mode = SORT_NAME;
+ * g_ptr_array_sort_with_data (file_list,
+ *                             (GCompareFunc) sort_filelist,
+ *                             GINT_TO_POINTER (sort_mode));
+ * ]|
  *
  * This is guaranteed to be a stable sort since version 2.32.
  */
@@ -1992,6 +2161,28 @@ GByteArray*
 g_byte_array_new (void)
 {
   return (GByteArray *)g_array_sized_new (FALSE, FALSE, 1, 0);
+}
+
+/**
+ * g_byte_array_steal:
+ * @array: a #GByteArray.
+ * @len: (optional) (out caller-allocates): pointer to retrieve the number of
+ *    elements of the original array
+ *
+ * Frees the data in the array and resets the size to zero, while
+ * the underlying array is preserved for use elsewhere and returned
+ * to the caller.
+ *
+ * Returns: (transfer full): the element data, which should be
+ *     freed using g_free().
+ *
+ * Since: 2.64
+ */
+guint8 *
+g_byte_array_steal (GByteArray *array,
+                    gsize *len)
+{
+  return (guint8 *) g_array_steal ((GArray *) array, len);
 }
 
 /**

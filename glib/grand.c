@@ -434,7 +434,7 @@ g_rand_set_seed_array (GRand         *rand,
  * @rand_: a #GRand
  *
  * Returns a random #gboolean from @rand_.
- * This corresponds to a unbiased coin toss.
+ * This corresponds to an unbiased coin toss.
  *
  * Returns: a random #gboolean
  */
@@ -502,7 +502,7 @@ g_rand_int_range (GRand  *rand,
                   gint32  end)
 {
   guint32 dist = end - begin;
-  guint32 random;
+  guint32 random = 0;
 
   g_return_val_if_fail (rand != NULL, begin);
   g_return_val_if_fail (end > begin, begin);
@@ -563,7 +563,6 @@ g_rand_int_range (GRand  *rand,
 	}
       break;
     default:
-      random = 0;		/* Quiet GCC */
       g_assert_not_reached ();
     }      
  
@@ -634,7 +633,7 @@ get_global_random (void)
  * g_random_boolean:
  *
  * Returns a random #gboolean.
- * This corresponds to a unbiased coin toss.
+ * This corresponds to an unbiased coin toss.
  *
  * Returns: a random #gboolean
  */

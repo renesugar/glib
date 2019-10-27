@@ -1,3 +1,170 @@
+Overview of changes in GLib 2.63.0
+==================================
+
+* Add g_fsync() API (#35)
+
+* Fix regression in g_file_copy() when passing
+  `G_FILE_COPY_TARGET_DEFAULT_PERMS` flag; the destination permissions would be
+  private rather than following the process’ umask (!1142)
+
+* Several `GDateTime` parsing fixes (!1127)
+
+* Always build the tests if installed-tests are enabled, so that the tests can
+  actually be installed (!1141)
+
+* Rework atomic function implementations to use memory barrier in the correct
+  place (when compiler intrinsics aren’t providing the atomics), and fix
+  signedness issues (#1449, #1565)
+
+* Use the OS’ `fdwalk()` function (if safe) to speed up `g_spawn_*()` on BSD (#1638)
+
+* Remove the macOS `dyld` `GModule` implementation in favour of `dl` instead (!1093)
+
+* Bump Python requirement to ≥ 3.5, which we implicitly relied on anyway through
+  our Meson dependency (!1132)
+
+* Bugs fixed:
+ - #35 add g_fsync to API
+ - #174 g_file_copy always preserves  permissions, even if G_FILE_COPY_ALL_METADATA flag is not set
+ - #259 docs: fix a misunderstanding in g_type_add_interface_*
+ - #767 g_signal_lookup fails if class is not referenced
+ - #1052 g_io_write_chars calls abort when given a null byte as input
+ - #1449 glib fallback atomic int/ptr get/set have memory barrier in wrong place
+ - #1565 Signedness of atomic operations
+ - #1638 g_spawn_*() is extremely slow under certain circumstances
+ - #1809 Provide API for working with PKCS11 backed certificates
+ - #1843 TSAN false positive with g_atomic_pointer_get/g_atomic_pointer_set under Clang
+ - #1865 g_variant_get_data_as_bytes fails after serializing a variant
+ - #1875 Segfault and Overflow in __gio_xdg_cache_mime_type_subclass() with Wps-Office installed
+ - #1887 glib 2.62.0 breaks loading dylibs as modules
+ - #1888 2.62: docs build on Windows broken
+ - #1897 glib 2.62.0 fails test 'test_writev_no_vectors' wih gcc7
+ - !1020 docs: Remove priv pointers from the tutorial example
+ - !1062 gtype: mark the inline functions in G_DECLARE_*_TYPE() as UNUSED
+ - !1080 tests: Fix skipping mkdir-with-parents-permission test
+ - !1088 Various small scan-build fixes
+ - !1090 giochannel: Clarify type of GSource callback in documentation
+ - !1093 gmodule: remove macOS dyld implementation
+ - !1095 Define G_IOV_MAX to 512 on macOS/iOS
+ - !1099 gmem: clarify that g_malloc always uses the system allocator
+ - !1109 doc: fix typo in gio/gsettings.c
+ - !1110 gio: Add missing "gio remove" option to bash completion script
+ - !1112 Add version macros for GLib 2.64
+ - !1115 gdatetime: Fix error handling in g_date_time_new_ordinal()
+ - !1116 gmarkup: Add a limit on the number of attributes in an element
+ - !1119 Annotate the return value of various utility functions
+ - !1124 docs: Fix typo in GConverter{Input,Output}Stream section titles
+ - !1125 gdatetime: Fix error handling in g_date_time_new_week()
+ - !1126 fileinfo: Mention that usec mtimes are set
+ - !1129 gdate: Fix tautological comparison warnings on Android
+ - !1130 Improve GLIB_DEPRECATED_MACRO_FOR output
+ - !1131 gio/gfileinfo: fix param reference in doc comment
+ - !1132 build: Bump Python requirement to ≥ 3.5
+ - !1137 gregistrysettings: bump key name length to 2048
+ - !1138 Always build tests if we enabled installed-tests
+ - !1139 g_file_info_get_modification_date_time: Calculate in integer domain
+
+* Translation updates:
+ - Danish
+ - Italian
+ - Panjabi
+ - Serbian
+ - Turkish
+
+
+Overview of changes in GLib 2.62.0
+==================================
+
+* Fix new `GFileInfo` APIs to work when `G_FILE_ATTRIBUTE_TIME_MODIFIED_USEC`
+  was not queried (!1087)
+
+* Bugs fixed:
+ - #487 Add valgrind test runs to CI
+ - !1084 garray: Fix reference to GLIB_SIZEOF_INT
+ - !1086 glib.supp: make gobject_init() calloc also of the possible kind
+ - !1087 fileinfo: ignore USEC if not available
+
+* Translation updates:
+ - Friulian
+ - Portuguese (Brazil)
+
+
+Overview of changes in GLib 2.61.3
+==================================
+
+* Support setting thread name on BSD systems (#1761)
+
+* Install previously-uninstalled headers for public `GNativeSocketAddress`
+  object (#1854)
+
+* Very initial support for Windows apps (UWP) (!1057)
+
+* Add various new valgrind suppressions to `glib.supp` (#1879, !1075)
+
+* Bugs fixed:
+ - #83 Optimisation for g_nearest_pow() in garray.c
+ - #512 GSignal: accumulator function not called to accumulate G_SIGNAL_RUN_CLEANUP object handler return values
+ - #873 allow NULL arguments to parse_strv
+ - #905 Patches from static analysis run on 2.40
+ - #1057 goption: add sanity check to input parameters
+ - #1309 GSettings object stops emitting "changed" signal on g_settings_reset after call to g_settings_delay
+ - #1620 GDBus criticals from GVfs with GLib master
+ - #1761 Setting thread-name on BSD systems
+ - #1803 GDK_SCALE=X is not respected when using "gio open"
+ - #1819 Invalid characters in Open Location dialog crashes GIMP
+ - #1852 Regression: g_mkdir_with_parents() returns 0 on failure
+ - #1854 glib/gio: GNativeSocketAddress headers not installed.
+ - #1860 g_clear_handle_id does not trigger GLIB_VERSION_MAX_ALLOWED warning
+ - #1863 Potential invalid writes on g_utf8_strreverse
+ - #1867 A couple of en_GBisms
+ - #1870 GSettingsBackend watches not thread-safe
+ - #1879 Incomplete valgrind suppressions - 16 KiB leak reported by valgrind from loading libglib-2.0.so
+ - #1880 glib/gbacktrace.c: If dup2 happened to return -1, don't call dup2 with same value
+ - #1881 GIO_USE_VOLUME_MONITOR and GIO_USE_FILE_MONITOR do not work as documented
+ - !1002 Remove mentions of mailing lists from the documentation
+ - !1011 gapplication: Fix a leaking GRemoteActionGroup member
+ - !1015 Post-release version bump
+ - !1016 gnetworkmonitornm fixups
+ - !1017 Improve ISO 8601 parsing by GDateTime
+ - !1023 g_object_get_property: Improve documentation for use of G_VALUE_INIT
+ - !1026 gutf8: Assert that written memory stays in bounds
+ - !1027 gfileutils: Fix error propagation for other than ENOENT
+ - !1031 meson: build gnulib if printf isn't good enough
+ - !1032 meson: small printf check cleanups
+ - !1033 win32: don't assume the format specifier for the stdlib printf/scanf like functions
+ - !1034 glib/tests/fileutils: Add a reproducer for #1852
+ - !1036 cond test: Don't make assumptions about struct sigaction member order
+ - !1037 Meson: Override glib-compile-resources/schemas
+ - !1044 Relax use of g_test_bug() to not require g_test_bug_base() to be called first
+ - !1049 minor typos in the documentation
+ - !1050 tests: Fix a pragma warning on FreeBSD
+ - !1054 gerror: Add a docs paragraph about not displaying errors verbatim in UI
+ - !1057 Some (probably) easy uwp patches
+ - !1059 Update win32 readme, add myself to codeowners
+ - !1066 libffi.wrap: Meson port has moved to FDO gitlab
+ - !1068 gsubprocesslauncher.c: fix documentation
+ - !1071 meson: Move libdl_dep to the top level
+ - !1074 Adjust README formatting
+ - !1075 glib.supp: add suppression for g_type_class_ref()
+
+* Translation updates:
+ - Basque
+ - Catalan
+ - Czech
+ - English (United Kingdom)
+ - French
+ - Galician
+ - German
+ - Hungarian
+ - Indonesian
+ - Korean
+ - Lithuanian
+ - Polish
+ - Romanian
+ - Spanish
+ - Swedish
+
+
 Overview of changes in GLib 2.61.2
 ==================================
 

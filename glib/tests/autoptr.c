@@ -10,6 +10,9 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC(HasNonVoidCleanup, non_void_cleanup)
 static void
 test_autofree (void)
 {
+#ifdef __clang_analyzer__
+  g_test_skip ("autofree tests aren’t understood by the clang analyser");
+#else
   g_autofree gchar *p = NULL;
   g_autofree gchar *p2 = NULL;
   g_autofree gchar *alwaysnull = NULL;
@@ -35,6 +38,7 @@ test_autofree (void)
     }
 
   g_assert_null (alwaysnull);
+#endif  /* __clang_analyzer__ */
 }
 
 static void
@@ -409,9 +413,11 @@ test_g_rec_mutex_locker (void)
       g_thread_join (thread);
     }
 
-    /* Verify that the mutex is unlocked again */
-    thread = g_thread_new ("rec mutex unlocked", rec_mutex_unlocked_thread, &rec_mutex);
-    g_thread_join (thread);
+  /* Verify that the mutex is unlocked again */
+  thread = g_thread_new ("rec mutex unlocked", rec_mutex_unlocked_thread, &rec_mutex);
+  g_thread_join (thread);
+
+  g_rec_mutex_clear (&rec_mutex);
 }
 
 /* Thread function to check that an rw lock given in @data cannot be writer locked */
@@ -478,6 +484,8 @@ test_g_rw_lock_lockers (void)
    * the locks taken above have been correctly released. */
   g_assert_true (g_rw_lock_writer_trylock (&lock));
   g_rw_lock_writer_unlock (&lock);
+
+  g_rw_lock_clear (&lock);
 }
 
 static void
@@ -588,6 +596,9 @@ test_autolist (void)
 
     l = g_list_prepend (l, b1);
     l = g_list_prepend (l, b3);
+
+    /* Squash warnings about dead stores */
+    (void) l;
   }
 
   /* Only assert if autoptr works */

@@ -57,6 +57,9 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#ifdef HAVE_PTHREAD_SET_NAME_NP
+#include <pthread_np.h>
+#endif
 #ifdef HAVE_SCHED_H
 #include <sched.h>
 #endif
@@ -1245,10 +1248,14 @@ g_system_thread_exit (void)
 void
 g_system_thread_set_name (const gchar *name)
 {
-#if defined(HAVE_PTHREAD_SETNAME_NP_WITH_TID)
-  pthread_setname_np (pthread_self(), name); /* on Linux and Solaris */
-#elif defined(HAVE_PTHREAD_SETNAME_NP_WITHOUT_TID)
+#if defined(HAVE_PTHREAD_SETNAME_NP_WITHOUT_TID)
   pthread_setname_np (name); /* on OS X and iOS */
+#elif defined(HAVE_PTHREAD_SETNAME_NP_WITH_TID)
+  pthread_setname_np (pthread_self (), name); /* on Linux and Solaris */
+#elif defined(HAVE_PTHREAD_SETNAME_NP_WITH_TID_AND_ARG)
+  pthread_setname_np (pthread_self (), "%s", (gchar *) name); /* on NetBSD */
+#elif defined(HAVE_PTHREAD_SET_NAME_NP)
+  pthread_set_name_np (pthread_self (), name); /* on FreeBSD, DragonFlyBSD, OpenBSD */
 #endif
 }
 
@@ -1409,7 +1416,7 @@ void
 g_cond_wait (GCond  *cond,
              GMutex *mutex)
 {
-  guint sampled = g_atomic_int_get (&cond->i[0]);
+  guint sampled = (guint) g_atomic_int_get (&cond->i[0]);
 
   g_mutex_unlock (mutex);
   syscall (__NR_futex, &cond->i[0], (gsize) FUTEX_WAIT_PRIVATE, (gsize) sampled, NULL);

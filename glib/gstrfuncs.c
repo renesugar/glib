@@ -491,7 +491,7 @@ g_stpcpy (gchar       *dest,
 
 /**
  * g_strdup_vprintf:
- * @format: a standard printf() format string, but notice
+ * @format: (not nullable): a standard printf() format string, but notice
  *     [string precision pitfalls][string-precision]
  * @args: the list of parameters to insert into the format string
  *
@@ -499,6 +499,10 @@ g_stpcpy (gchar       *dest,
  * calculates the maximum space required and allocates memory to hold
  * the result. The returned string should be freed with g_free() when
  * no longer needed.
+ *
+ * The returned string is guaranteed to be non-NULL, unless @format
+ * contains `%lc` or `%ls` conversions, which can fail if no multibyte
+ * representation is available for the given character.
  *
  * See also g_vasprintf(), which offers the same functionality, but
  * additionally returns the length of the allocated string.
@@ -518,7 +522,7 @@ g_strdup_vprintf (const gchar *format,
 
 /**
  * g_strdup_printf:
- * @format: a standard printf() format string, but notice
+ * @format: (not nullable): a standard printf() format string, but notice
  *     [string precision pitfalls][string-precision]
  * @...: the parameters to insert into the format string
  *
@@ -526,6 +530,10 @@ g_strdup_vprintf (const gchar *format,
  * calculates the maximum space required and allocates memory to hold
  * the result. The returned string should be freed with g_free() when no
  * longer needed.
+ *
+ * The returned string is guaranteed to be non-NULL, unless @format
+ * contains `%lc` or `%ls` conversions, which can fail if no multibyte
+ * representation is available for the given character.
  *
  * Returns: a newly-allocated string holding the result
  */
@@ -2331,7 +2339,7 @@ g_strchomp (gchar *string)
  *
  * As a special case, the result of splitting the empty string "" is an empty
  * vector, not a vector containing a single string. The reason for this
- * special case is that being able to represent a empty vector is typically
+ * special case is that being able to represent an empty vector is typically
  * more useful than consistent handling of empty elements. If you do need
  * to represent empty elements, you'll need to check for the empty string
  * before calling g_strsplit().
@@ -2413,7 +2421,7 @@ g_strsplit (const gchar *string,
  *
  * As a special case, the result of splitting the empty string "" is an empty
  * vector, not a vector containing a single string. The reason for this
- * special case is that being able to represent a empty vector is typically
+ * special case is that being able to represent an empty vector is typically
  * more useful than consistent handling of empty elements. If you do need
  * to represent empty elements, you'll need to check for the empty string
  * before calling g_strsplit_set().

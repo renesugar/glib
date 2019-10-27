@@ -12,7 +12,7 @@ endif
 # <https://github.com/mesonbuild/meson/issues/3937>. When we can depend
 # on a meson version where those are fixed, revert the commit that
 # introduced this workaround.
-if have_good_vsnprintf and have_good_snprintf and have_good_printf
+if use_system_printf
   gnulib_lib = []
   gnulib_objects = []
   gnulib_libm_dependency = []
@@ -458,8 +458,6 @@ if enable_systemtap
   )
 endif
 
-# Don’t build the tests unless we can run them (either natively or in an exe wrapper)
-build_tests = not meson.is_cross_build() or (meson.is_cross_build() and meson.has_exe_wrapper())
 if build_tests
   subdir('tests')
 endif

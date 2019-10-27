@@ -1224,6 +1224,10 @@ g_signal_stop_emission_by_name (gpointer     instance,
  *
  * Also tries the ancestors of the given type.
  *
+ * The type class passed as @itype must already have been instantiated (for
+ * example, using g_type_class_ref()) for this function to work, as signals are
+ * always installed during class initialization.
+ *
  * See g_signal_new() for details on allowed signal names.
  *
  * Returns: the signal's identifying number, or 0 if no signal was found.
@@ -3759,9 +3763,14 @@ signal_emit_unlocked_R (SignalNode   *node,
 			node->n_params + 1,
 			instance_and_params,
 			&emission.ihint);
+      if (!accumulate (&emission.ihint, emission_return, &accu, accumulator) &&
+          emission.state == EMISSION_RUN)
+        emission.state = EMISSION_STOP;
       if (need_unset)
 	g_value_unset (&accu);
       SIGNAL_LOCK ();
+      return_value_altered = TRUE;
+
       emission.chain_type = G_TYPE_NONE;
       
       if (emission.state == EMISSION_RESTART)

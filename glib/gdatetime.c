@@ -747,7 +747,7 @@ g_date_time_to_instant (GDateTime *datetime)
 /*< internal >
  * g_date_time_from_instant:
  * @tz: a #GTimeZone
- * @instant: a instant in time
+ * @instant: an instant in time
  *
  * Creates a #GDateTime from a time zone and an instant.
  *
@@ -1220,6 +1220,8 @@ g_date_time_new_ordinal (GTimeZone *tz, gint year, gint ordinal_day, gint hour, 
     return NULL;
 
   dt = g_date_time_new (tz, year, 1, 1, hour, minute, seconds);
+  if (dt == NULL)
+    return NULL;
   dt->days += ordinal_day - 1;
 
   return dt;
@@ -1239,6 +1241,8 @@ g_date_time_new_week (GTimeZone *tz, gint year, gint week, gint week_day, gint h
     return NULL;
 
   dt = g_date_time_new (tz, year, 1, 4, 0, 0, 0);
+  if (dt == NULL)
+    return NULL;
   g_date_time_get_week_number (dt, NULL, &jan4_week_day, NULL);
   g_date_time_unref (dt);
 
@@ -1327,9 +1331,7 @@ static GTimeZone *
 parse_iso8601_timezone (const gchar *text, gsize length, gssize *tz_offset)
 {
   gint i, tz_length, offset_hours, offset_minutes;
-#ifndef G_DISABLE_ASSERT
   gint offset_sign = 1;
-#endif
   GTimeZone *tz;
 
   /* UTC uses Z suffix  */
@@ -1343,9 +1345,7 @@ parse_iso8601_timezone (const gchar *text, gsize length, gssize *tz_offset)
   for (i = length - 1; i >= 0; i--)
     if (text[i] == '+' || text[i] == '-')
       {
-#ifndef G_DISABLE_ASSERT
         offset_sign = text[i] == '-' ? -1 : 1;
-#endif
         break;
       }
   if (i < 0)
@@ -1380,8 +1380,14 @@ parse_iso8601_timezone (const gchar *text, gsize length, gssize *tz_offset)
   tz = g_time_zone_new (text + i);
 
   /* Double-check that the GTimeZone matches our interpretation of the timezone.
-   * Failure would indicate a bug either here of in the GTimeZone code. */
-  g_assert (g_time_zone_get_offset (tz, 0) == offset_sign * (offset_hours * 3600 + offset_minutes * 60));
+   * This can fail because our interpretation is less strict than (for example)
+   * parse_time() in gtimezone.c, which restricts the range of the parsed
+   * integers. */
+  if (g_time_zone_get_offset (tz, 0) != offset_sign * (offset_hours * 3600 + offset_minutes * 60))
+    {
+      g_time_zone_unref (tz);
+      return NULL;
+    }
 
   return tz;
 }
@@ -1423,9 +1429,13 @@ parse_iso8601_time (const gchar *text, gsize length,
  *
  * Creates a #GDateTime corresponding to the given
  * [ISO 8601 formatted string](https://en.wikipedia.org/wiki/ISO_8601)
- * @text. ISO 8601 strings of the form <date><sep><time><tz> are supported.
+ * @text. ISO 8601 strings of the form <date><sep><time><tz> are supported, with
+ * some extensions from [RFC 3339](https://tools.ietf.org/html/rfc3339) as
+ * mentioned below.
  *
- * <sep> is the separator and can be either 'T', 't' or ' '.
+ * <sep> is the separator and can be either 'T', 't' or ' '. The latter two
+ * separators are an extension from
+ * [RFC 3339](https://tools.ietf.org/html/rfc3339#section-5.6).
  *
  * <date> is in the form:
  *

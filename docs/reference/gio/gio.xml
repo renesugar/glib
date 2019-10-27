@@ -226,6 +226,10 @@
                 <term><option>-P</option>, <option>--no-dereference</option></term>
                 <listitem><para>Never follow symbolic links.</para></listitem>
               </varlistentry>
+              <varlistentry>
+                <term><option>--default-permissions</option></term>
+                <listitem><para>Use the default permissions of the current process for the destination file, rather than copying the permissions of the source file.</para></listitem>
+              </varlistentry>
             </variablelist>
           </refsect3>
         </listitem>
@@ -506,6 +510,8 @@
             <filename><envar>$XDG_DATA_HOME</envar>/applications/mimeapps.list</filename>.</para>
           <para>The <command>mime</command> command can be used to change the default handler for
             a mimetype.</para>
+          <para>Environment variables will not be set on the application, as it
+            may be an existing process which is activated to handle the new file.</para>
         </listitem>
       </varlistentry>
 
